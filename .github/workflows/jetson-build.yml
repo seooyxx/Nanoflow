@@ -1,0 +1,78 @@
+name: Build (JetPack ARM64)
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+jobs:
+  build_jetpack:
+    name: Build Shared Library (JetPack ARM64)
+    runs-on: ubuntu-latest
+    container:
+      image: nvcr.io/nvidia/l4t-jetpack:r36.3.0  # ARM64 
+      options: --privileged
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.10", "3.11"]
+    steps:
+      # 1. Checkout the repository
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      # 2. Set up Environments
+      - name: Set up Environments
+        run: |
+          echo "PYTHON_VERSION=$(python3 -c "from os import environ as env; print({'3.7': 'cp37-cp37m', '3.8': 'cp38-cp38', '3.9': 'cp39-cp39', '3.10': 'cp310-cp310', '3.11': 'cp311-cp311', '3.12': 'cp312-cp312' }['${{ matrix.python-version }}'])")" >> $GITHUB_ENV
+          echo "PATH=$PATH" >> $GITHUB_ENV
+
+      # 3. Install dependencies (adapted for Jetson)
+      - name: Set up Packages
+        env:
+          PYBIN: /opt/python/${{ env.PYTHON_VERSION }}/bin
+        run: |
+          apt-get update && apt-get upgrade -y
+          apt-get install -y python3 python3-pip
+          apt-get install -y openmpi-bin libopenmpi-dev libspdlog-dev libibverbs-dev rdma-core numactl numactl-dev nlohmann-json3-dev
+          apt-get install -y wget curl git cmake
+          $PYBIN/pip install cmake mypy pybind11 black torch wget pandas seaborn transformers pydantic sentencepiece
+          cd pipeline/src/generate-gemm && $PYBIN/python genGEMM.py && cd ../../
+
+      # 4. Build the shared library
+      - name: Build Library
+        env:
+          PATH: ${{ env.PATH }}:/usr/bin/openmpi/bin
+          PYBIN: /opt/python/${{ env.PYTHON_VERSION }}/bin
+          PREFIX: /opt/python/${{ env.PYTHON_VERSION }};/usr/lib/aarch64-linux-gnu/openmpi
+          pybind11_DIR: /opt/python/${{ env.PYTHON_VERSION }}/lib/python${{ matrix.python-version }}/site-packages/pybind11
+          CUDACXX: "/usr/local/cuda/bin/nvcc"
+          CUDA_HOME: "/usr/local/cuda"
+          CFLAGS: "-I/usr/include"
+          LDFLAGS: "-L/usr/lib"
+        run: |
+          cd pipeline && mkdir -p build && cd build
+          which cmake && cmake --version
+          which mpicxx && mpicxx --version
+          ${PYBIN}/cmake -DCMAKE_BUILD_TYPE=Release -DCMAKE_PREFIX_PATH=${PREFIX} -DBUILD_PYTHON_BINDINGS=OFF -DBYPASS_GPU_CHECK=ON -DUSE_CUDA=ON ..
+          make -j$(nproc)
+          tar -zcvf pllm_jetpack_py${{ matrix.python-version }}.tgz pllm_python.* test_*
+          ls -la
+
+      # 5. Upload artifacts (build outputs)
+      - uses: actions/upload-artifact@v4
+        with:
+          name: pllm_jetpack_py${{ matrix.python-version }}.tgz
+          path: |
+            pipeline/build/pllm_jetpack_py${{ matrix.python-version }}.tgz
+
+      # 6. Upload Release Asset (optional step for release)
+      - name: Upload Release Asset
+        uses: softprops/action-gh-release@v2
+        if: startsWith(github.ref, 'refs/tags/')
+        with:
+          files: |
+            pipeline/build/pllm_jetpack_py${{ matrix.python-version }}.tgz
