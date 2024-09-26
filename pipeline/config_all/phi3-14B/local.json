@@ -62,7 +62,7 @@
         "model": "microsoft/Phi-3-medium-4k-instruct",
         "actual_gpu_num": 1,
         "weight_path": "/nanoflow_weight_phi_3_medium_4k/",
-        "hf_path": "../../../hf/hub/models--microsoft--Phi-3-medium-4k-instruct/snapshots/<snapshot_id>",
+        "hf_path": "../../../hf/hub/models--microsoft--Phi-3-medium-4k-instruct/snapshots/ae004ae82eb6eddc32906dfacb1d6dfea8f91996",
         "pipeline_type": "NANOBATCH_LOCAL"
     }
   }
