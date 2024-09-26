@@ -33,7 +33,7 @@ jobs:
           dnf -y install epel-release && dnf upgrade
           dnf config-manager --add-repo https://developer.download.nvidia.com/compute/cuda/repos/rhel8/x86_64/cuda-rhel8.repo && dnf makecache
           dnf module install -y nvidia-driver:latest && dnf clean all
-          yum install -y pigz clang-tools-extra openmpi openmpi-devel spdlog spdlog-devel libibverbs rdma-core-devel numactl numactl-devel numactl-libs
+          yum install -y pigz clang-tools-extra openmpi openmpi-devel spdlog spdlog-devel libibverbs rdma-core-devel numactl numactl-devel numactl-libs nlohmann-json3-devel
           pwd && ls -la
           sed -i '256d' 3rdparty/mscclpp/src/bootstrap/bootstrap.cc
           cat 3rdparty/patches/spdlog/*.patch | patch -p1 -d 3rdparty/spdlog
